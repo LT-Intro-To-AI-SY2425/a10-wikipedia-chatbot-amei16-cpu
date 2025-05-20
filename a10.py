@@ -111,6 +111,57 @@ def get_birth_date(name: str) -> str:
 
     return match.group("birth")
 
+def get_population(location_name: str) -> str:
+    """Gets the population of the given country or city
+
+    Args:
+        location_name - name of the country or city to get population of
+
+    Returns:
+        population of the given country or city
+    """
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(location_name)))
+    pattern = r"(?:Population.*?)(?P<population>[\d,]+)(?:.*?)\s*people"
+    error_text = "Page infobox has no population information"
+    match = get_match(infobox_text, pattern, error_text)
+
+    return match.group("population")
+
+def get_official_language(country_name: str) -> str:
+    """Gets the official language(s) of the given country
+
+    Args:
+        country_name - name of the country to get official language(s) of
+
+    Returns:
+        official language(s) of the given country
+    """
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(country_name)))
+    pattern = r"(?:Official\s*languages.*?)(?P<languages>[\w\s,/-]+)(?:.*?)\n"
+    error_text = "Page infobox has no official language information"
+    match = get_match(infobox_text, pattern, error_text)
+
+    return match.group("languages")
+
+def get_birth_place(name: str) -> str:
+    """Gets the birth city and country of the given person
+
+    Args:
+        name - name of the person
+
+    Returns:
+        City and country of the given person
+    """
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(name)))
+    
+    # Regex pattern to capture city and country from the birth info
+    pattern = r"in\s*([A-Za-z\s]+),\s*([A-Za-z\s]+)"
+    error_text = "Page infobox has no birth place information"
+
+    match = get_match(infobox_text, pattern, error_text)
+
+    # Return the city and country as a formatted string
+    return f"{match.group(1).strip()}, {match.group(2).strip()}"
 
 # below are a set of actions. Each takes a list argument and returns a list of answers
 # according to the action and the argument. It is important that each function returns a
@@ -140,6 +191,38 @@ def polar_radius(matches: List[str]) -> List[str]:
     """
     return [get_polar_radius(matches[0])]
 
+def population(matches: List[str]) -> List[str]:
+    """Returns the population of a location in matches
+
+    Args:
+        matches - match from pattern of location to find population of
+
+    Returns:
+        population of the location
+    """
+    return [get_population(" ".join(matches))]
+
+def official_language(matches: List[str]) -> List[str]:
+    """Returns the official language(s) of the country in matches
+
+    Args:
+        matches - match from pattern of country to find official language(s) of
+
+    Returns:
+        official language(s) of the country
+    """
+    return [get_official_language(" ".join(matches))]
+
+def birth_place(matches: List[str]) -> List[str]:
+    """Returns birth place (city and country) of named person in matches
+
+    Args:
+        matches - match from pattern of person's name to find the birth place of
+
+    Returns:
+        Birth place of the named person
+    """
+    return [get_birth_place(" ".join(matches))]
 
 # dummy argument is ignored and doesn't matter
 def bye_action(dummy: List[str]) -> None:
@@ -156,6 +239,9 @@ Action = Callable[[List[str]], List[Any]]
 pa_list: List[Tuple[Pattern, Action]] = [
     ("when was % born".split(), birth_date),
     ("what is the polar radius of %".split(), polar_radius),
+    ("what is the population of %".split(), population),
+    ("what is the official language of %".split(), official_language),
+    ("where was % born".split(), birth_place),
     (["bye"], bye_action),
 ]
 
