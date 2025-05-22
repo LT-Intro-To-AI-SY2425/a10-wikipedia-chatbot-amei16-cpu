@@ -144,7 +144,7 @@ def get_official_language(country_name: str) -> str:
     return match.group("languages")
 
 def get_birth_place(person_name: str) -> str:
-    """Gets the birthplace of the given person
+    """Gets the birthplace of the given person from Wikipedia infobox text
 
     Args:
         person_name - name of the person to get birthplace of
@@ -153,11 +153,26 @@ def get_birth_place(person_name: str) -> str:
         birthplace of the given person
     """
     infobox_text = clean_text(get_first_infobox_text(get_page_html(person_name)))
-    pattern = r"\|\s*birth_place\s*=\s*(?P<birthplace>.+)"
+
+    pattern = (
+        r"Born(?:\([^)]+\))?\s*[A-Za-z]+\s*\d{1,2},\s*\d{4}"           # Birth date
+        r"(?:\s*\(age\s*\d+\))?"                                       # Optional (age ...)
+        r"\s*(?P<birthplace>[A-Za-z\s.]+,\s*[A-Za-z\s.]+(?:,\s*[A-Za-z\s.]+)?)"  # Birthplace
+    )
+
     error_text = "Page infobox has no birthplace information"
     match = get_match(infobox_text, pattern, error_text)
 
-    return match.group("birthplace").strip()
+    # Optional: strip trailing country if only city and state are needed
+    birthplace = match.group("birthplace").strip()
+
+    # Optional normalization: keep only "City, State" if desired
+    parts = [part.strip() for part in birthplace.split(',')]
+    if len(parts) >= 2:
+        birthplace = f"{parts[0]}, {parts[1]}"
+
+    return birthplace
+
 
 
 # below are a set of actions. Each takes a list argument and returns a list of answers
