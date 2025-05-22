@@ -153,25 +153,36 @@ def get_birth_place(person_name: str) -> str:
         birthplace of the given person
     """
     infobox_text = clean_text(get_first_infobox_text(get_page_html(person_name)))
-
+    print(infobox_text)
     pattern = (
-        r"Born(?:\([^)]+\))?\s*[A-Za-z]+\s*\d{1,2},\s*\d{4}"           # Birth date
-        r"(?:\s*\(age\s*\d+\))?"                                       # Optional (age ...)
-        r"\s*(?P<birthplace>[A-Za-z\s.]+,\s*[A-Za-z\s.]+(?:,\s*[A-Za-z\s.]+)?)"  # Birthplace
+    r"Born"                                 # Match 'Born'
+    r"(?:[^\(\n]*\(\d{4}-\d{2}-\d{2}\))?"  # Optional ISO date in parentheses
+    r"[^\dA-Z\n]{0,20}?"                    # Optional text (like name, refs) non-digit, non-uppercase
+    r"(?:"
+        r"(?P<date1>[A-Z][a-z]+ \d{1,2}, \d{4})"  # Date format: March 14, 1988
+        r"|"
+        r"(?P<date2>\d{1,2} [A-Z][a-z]+ \d{4})"   # Date format: 6 October 2004
+        r"|"
+        r"(?P<date3>\d{4}-\d{2}-\d{2})"            # ISO Date alone (e.g. 1809-02-12)
+    r")"
+    r"(?:\s*\(age \d+\))?"                   # Optional age info
+    r"\s*"
+    r"(?P<birthplace>"
+        r"[A-Z][a-zA-Z\s\.\-']+?,\s*[A-Z][a-zA-Z\s\.\-']+?(?:,\s*[A-Z][a-zA-Z\s\.\-']+?)?"
+    r")"
+    r"(?=\s*(?:Died|Listed height|Height|Nationality|Occupation|Political|Spouse|Partner|Children|College|NBA draft|High school|Playing career|Military|Website|Stats|Medals|Relatives|Parents|$))"
     )
+
+
 
     error_text = "Page infobox has no birthplace information"
     match = get_match(infobox_text, pattern, error_text)
 
-    # Optional: strip trailing country if only city and state are needed
-    birthplace = match.group("birthplace").strip()
-
-    # Optional normalization: keep only "City, State" if desired
-    parts = [part.strip() for part in birthplace.split(',')]
+    # Optional: trim down to City, State only
+    parts = [part.strip() for part in match.group("birthplace").split(',')]
     if len(parts) >= 2:
-        birthplace = f"{parts[0]}, {parts[1]}"
-
-    return birthplace
+        return f"{parts[0]}, {parts[1]}"
+    return match.group("birthplace").strip()
 
 
 
