@@ -121,7 +121,7 @@ def get_population(location_name: str) -> str:
         population of the given country or city
     """
     infobox_text = clean_text(get_first_infobox_text(get_page_html(location_name)))
-    pattern = r"(?:Population.*?)(?P<population>[\d,]+)(?:.*?)\s*people"
+    pattern = r'<td class="infobox-data">(?:.|\n)*?"(?P<population>[\d,]+)"'
     error_text = "Page infobox has no population information"
     match = get_match(infobox_text, pattern, error_text)
 
@@ -137,31 +137,28 @@ def get_official_language(country_name: str) -> str:
         official language(s) of the given country
     """
     infobox_text = clean_text(get_first_infobox_text(get_page_html(country_name)))
-    pattern = r"(?:Official\s*languages.*?)(?P<languages>[\w\s,/-]+)(?:.*?)\n"
+    pattern = r"(?:Official|National)\s*language(?:s)?\s*[:\-]?\s*(?P<languages>[A-Za-z\s,/-]+)"
     error_text = "Page infobox has no official language information"
     match = get_match(infobox_text, pattern, error_text)
 
     return match.group("languages")
 
-def get_birth_place(name: str) -> str:
-    """Gets the birth city and country of the given person
+def get_birth_place(person_name: str) -> str:
+    """Gets the birthplace of the given person
 
     Args:
-        name - name of the person
+        person_name - name of the person to get birthplace of
 
     Returns:
-        City and country of the given person
+        birthplace of the given person
     """
-    infobox_text = clean_text(get_first_infobox_text(get_page_html(name)))
-    
-    # Regex pattern to capture city and country from the birth info
-    pattern = r"in\s*([A-Za-z\s]+),\s*([A-Za-z\s]+)"
-    error_text = "Page infobox has no birth place information"
-
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(person_name)))
+    pattern = r"\|\s*birth_place\s*=\s*(?P<birthplace>.+)"
+    error_text = "Page infobox has no birthplace information"
     match = get_match(infobox_text, pattern, error_text)
 
-    # Return the city and country as a formatted string
-    return f"{match.group(1).strip()}, {match.group(2).strip()}"
+    return match.group("birthplace").strip()
+
 
 # below are a set of actions. Each takes a list argument and returns a list of answers
 # according to the action and the argument. It is important that each function returns a
