@@ -92,40 +92,18 @@ def get_polar_radius(planet_name: str) -> str:
 
     return match.group("radius")
 
-
-def get_birth_date(name: str) -> str:
-    """Gets birth date of the given person
-
-    Args:
-        name - name of the person
-
-    Returns:
-        birth date of the given person
-    """
-    infobox_text = clean_text(get_first_infobox_text(get_page_html(name)))
-    pattern = r"(?:Born\D*)(?P<birth>\d{4}-\d{2}-\d{2})"
-    error_text = (
-        "Page infobox has no birth information (at least none in xxxx-xx-xx format)"
-    )
-    match = get_match(infobox_text, pattern, error_text)
-
-    return match.group("birth")
-
 def get_population(location_name: str) -> str:
-    """Gets the population of the given country or city
-
-    Args:
-        location_name - name of the country or city to get population of
-
-    Returns:
-        population of the given country or city
-    """
     infobox_text = clean_text(get_first_infobox_text(get_page_html(location_name)))
-    pattern = r'<td class="infobox-data">(?:.|\n)*?"(?P<population>[\d,]+)"'
+    # Improved pattern: handles "Population", optional year, and references
+    pattern = (
+        r'Population(?: [^\d\n]*)?'      # "Population" and optional non-digit stuff (like (2020))
+        r'[\s\S]{0,40}?'                 # up to 40 characters (to skip over references, etc.)
+        r'(?P<population>\d{1,3}(?:,\d{3})+)'  # the number with commas
+    )
     error_text = "Page infobox has no population information"
     match = get_match(infobox_text, pattern, error_text)
-
     return match.group("population")
+
 
 def get_official_language(country_name: str) -> str:
     """Gets the official language(s) of the given country
@@ -137,54 +115,52 @@ def get_official_language(country_name: str) -> str:
         official language(s) of the given country
     """
     infobox_text = clean_text(get_first_infobox_text(get_page_html(country_name)))
-    pattern = r"(?:Official|National)\s*language(?:s)?\s*[:\-]?\s*(?P<languages>[A-Za-z\s,/-]+)"
+    pattern = r'Population[^\d]*(?P<population>\d{1,3}(?:,\d{3})+)'
     error_text = "Page infobox has no official language information"
     match = get_match(infobox_text, pattern, error_text)
 
     return match.group("languages")
 
 def get_birth_place(person_name: str) -> str:
-    """Gets the birthplace of the given person from Wikipedia infobox text
+    """Gets the birthplace of the given person from Wikipedia infobox text.
 
     Args:
-        person_name - name of the person to get birthplace of
+        person_name: name of the person to get birthplace of
 
     Returns:
-        birthplace of the given person
+        Birthplace of the given person
     """
     infobox_text = clean_text(get_first_infobox_text(get_page_html(person_name)))
-    print(infobox_text)
+
     pattern = (
-    r"Born"                                 # Match 'Born'
-    r"(?:[^\(\n]*\(\d{4}-\d{2}-\d{2}\))?"  # Optional ISO date in parentheses
-    r"[^\dA-Z\n]{0,20}?"                    # Optional text (like name, refs) non-digit, non-uppercase
-    r"(?:"
-        r"(?P<date1>[A-Z][a-z]+ \d{1,2}, \d{4})"  # Date format: March 14, 1988
-        r"|"
-        r"(?P<date2>\d{1,2} [A-Z][a-z]+ \d{4})"   # Date format: 6 October 2004
-        r"|"
-        r"(?P<date3>\d{4}-\d{2}-\d{2})"            # ISO Date alone (e.g. 1809-02-12)
-    r")"
-    r"(?:\s*\(age \d+\))?"                   # Optional age info
-    r"\s*"
-    r"(?P<birthplace>"
-        r"[A-Z][a-zA-Z\s\.\-']+?,\s*[A-Z][a-zA-Z\s\.\-']+?(?:,\s*[A-Z][a-zA-Z\s\.\-']+?)?"
-    r")"
-    r"(?=\s*(?:Died|Listed height|Height|Nationality|Occupation|Political|Spouse|Partner|Children|College|NBA draft|High school|Playing career|Military|Website|Stats|Medals|Relatives|Parents|$))"
+        r"Born"                                           # Start after 'Born'
+        r"(?:[^A-Za-z0-9\n]*(?:[^\n]*?\([^\)]*\)))?"      # Optional ISO date or extra in parenthesis
+        r"(?:[^A-Za-z0-9\n]*(?:[A-Z][a-z]+\s+\d{1,2},\s+\d{4}|"  # e.g. March 14, 1988
+        r"\d{1,2}\s+[A-Z][a-z]+\s+\d{4}|"                  # e.g. 6 October 2004
+        r"\d{4}-\d{2}-\d{2}))?"                            # or ISO date
+        r"(?:\s*\(age\s+\d+\))?"                           # Optional (age XX)
+        r"(?:\[[^\]]+\])?"                                 # Optional citation [1], [2], etc.
+        r"[\s,]*"
+        r"(?P<birthplace>[A-Z][^\n,]*?(?:,\s*[A-Za-z .&'-]+)+)"  # Birthplace must have at least one comma
+        r"(?=\s*(Died|Other names|Height|Listed|Height|Nationality|Occupation|Political|Spouse|Partner|"
+        r"Children|College|NBA draft|High school|Playing career|Military|Website|Stats|Medals|"
+        r"Relatives|Parents|Genres|Years active|Labels|Member of|$))"
     )
-
-
 
     error_text = "Page infobox has no birthplace information"
     match = get_match(infobox_text, pattern, error_text)
 
-    # Optional: trim down to City, State only
-    parts = [part.strip() for part in match.group("birthplace").split(',')]
+    # Clean and normalize result
+    birthplace = match.group("birthplace").strip()
+    # Remove any trailing field names accidentally captured (e.g., "Citizenship", "Occupation", etc.)
+    birthplace = re.split(
+        r"(?=Died|Other names|Height|Listed|Nationality|Occupation|Political|Spouse|Partner|Children|College|NBA draft|High school|Playing career|Military|Website|Stats|Medals|Relatives|Parents|Genres|Years active|Labels|Member of|Citizenship\b)",
+        birthplace
+    )[0].strip()
+    parts = [part.strip() for part in birthplace.split(',')]
     if len(parts) >= 2:
         return f"{parts[0]}, {parts[1]}"
-    return match.group("birthplace").strip()
-
-
+    return birthplace
 
 
 # below are a set of actions. Each takes a list argument and returns a list of answers
@@ -294,7 +270,7 @@ def search_pa_list(src: List[str]) -> List[str]:
 def query_loop() -> None:
     """The simple query loop. The try/except structure is to catch Ctrl-C or Ctrl-D
     characters and exit gracefully"""
-    print("Welcome to the movie database!\n")
+    print("Welcome to the random database!\n")
     while True:
         try:
             print()
